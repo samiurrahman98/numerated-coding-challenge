@@ -1,13 +1,10 @@
 import { Component, OnInit } from '@angular/core';
-import { DatePipe } from '@angular/common';
 
 import { Route } from '../route';
 import { Stop } from '../stop';
 import { RoutePattern } from '../route-pattern';
 import { PredictionWrapper, Prediction, PredictionState } from './../prediction';
-
-import { Filter } from './../filter';
-import { Fields } from './../fields';
+import { RequestWrapper } from './../request';
 
 import { ApiService } from '../api.service';
 import { MessageService } from '../message.service';
@@ -35,14 +32,12 @@ export class ProjectComponent implements OnInit {
     this.getRoutes();
   }
 
+  // change handlers
+
   onSelectRoute(routeId: string): void {
-    this.selectedStop = null;
-    this.stops = [];
-
-    this.selectedRoutePattern = null;
-    this.routePatterns = [];
-
-    this.nextPredictedDeparture = null;
+    this.clearStops();
+    this.clearRoutePatterns();
+    this.clearNextPredictedDeparture();
 
     this.selectedRoute = routeId;
     this.messageService.add(`ProjectComponent: Selected route id = ${routeId}`);
@@ -50,10 +45,8 @@ export class ProjectComponent implements OnInit {
   }
 
   onSelectStop(stopId: string): void {
-    this.selectedRoutePattern = null;
-    this.routePatterns = [];
-
-    this.nextPredictedDeparture = null;
+    this.clearRoutePatterns();
+    this.clearNextPredictedDeparture();
 
     this.selectedStop = stopId;
     this.messageService.add(`ProjectComponent: Selected stop id = ${stopId}`);
@@ -61,83 +54,48 @@ export class ProjectComponent implements OnInit {
   }
 
   onSelectRoutePattern(routePatternId: string): void {
-    this.nextPredictedDeparture = null;
+    this.clearNextPredictedDeparture();
 
     this.selectedRoutePattern = routePatternId;
-    this.messageService.add(`ProjectComponent: Selected direction id = ${routePatternId}`);
+    this.messageService.add(`ProjectComponent: Selected route pattern id = ${routePatternId}`);
     this.getNextPredictedDepartureTime(this.selectedRoute, this.selectedStop, this.selectedRoutePattern);
   }
 
+  // methods to prepare requests to service
+
   getRoutes(): void {
-    const endpoint = 'routes';
+    const rw = new RequestWrapper('routes');
+    rw.addFilter('type', '0,1');
+    rw.specifyFields('route', 'long_name,direction_names');
+    rw.specifySortParam('long_name');
 
-    const filters: Filter[] = [];
-    const filter: Filter = {
-      resource: 'type',
-      values: '0,1'
-    };
-    filters.push(filter);
-
-    const fields: Fields = {
-      resource: 'route',
-      values: 'long_name,direction_names'
-    };
-
-    const sort = 'long_name';
-
-    this.apiService.getResource(endpoint, filters, fields, sort)
+    this.apiService.getResource(rw)
       .subscribe(val => {
         this.routes = val.data;
       });
   }
 
   getStops(routeId: string): void {
-    const endpoint = 'stops';
+    const rw = new RequestWrapper('stops');
+    rw.addFilter('route', routeId);
+    rw.specifyFields('stop', 'name,address');
+    rw.specifySortParam('name');
 
-    const filters: Filter[] = [];
-    const filter: Filter = {
-      resource: 'route',
-      values: routeId
-    };
-    filters.push(filter);
-
-    const fields: Fields = {
-      resource: 'stop',
-      values: 'name,address'
-    };
-
-    const sort = 'name';
-
-    this.apiService.getResource(endpoint, filters, fields, sort)
+    this.apiService.getResource(rw)
       .subscribe(val => {
         this.stops = val.data;
       });
   }
 
   getRoutePatterns(routeId: string, stopId: string) {
-    const route: Route = this.routes.find(r => r.id === routeId);
+    const rw = new RequestWrapper('route_patterns');
+    rw.addFilter('route', routeId);
+    rw.addFilter('stop', stopId);
+    rw.specifySortParam('direction_id');
 
-    const endpoint = 'route_patterns';
-
-    const filters: Filter[] = [];
-    const routeFilter: Filter = {
-      resource: 'route',
-      values: routeId
-    };
-    filters.push(routeFilter);
-
-    const stopFilter: Filter = {
-      resource: 'stop',
-      values: stopId
-    };
-    filters.push(stopFilter);
-
-    let fields: Fields;
-
-    const sort = 'direction_id';
-
-    this.apiService.getResource(endpoint, filters, fields, sort)
+    this.apiService.getResource(rw)
       .subscribe(val => {
+        const route: Route = this.routes.find(r => r.id === routeId);
         for (const routePattern of val.data) {
           const routePatternId = routePattern.id;
           const routePatternName = routePattern.attributes.name;
@@ -153,38 +111,15 @@ export class ProjectComponent implements OnInit {
       });
   }
 
-  getNextPredictedDepartureTime(routeId: string, stopId: string, directionId: string): void {
-    const endpoint = 'predictions';
+  getNextPredictedDepartureTime(routeId: string, stopId: string, routePatternId: string): void {
+    const rw = new RequestWrapper('predictions');
+    rw.addFilter('route', routeId);
+    rw.addFilter('stop', stopId);
+    rw.addFilter('route_pattern', routePatternId);
+    rw.specifyFields('prediction', 'departure_time');
+    rw.specifyLimit(1);
 
-    const filters: Filter[] = [];
-    const routeFilter: Filter = {
-      resource: 'route',
-      values: routeId
-    };
-    filters.push(routeFilter);
-
-    const stopFilter: Filter = {
-      resource: 'stop',
-      values: stopId
-    };
-    filters.push(stopFilter);
-
-    const directionFilter: Filter = {
-      resource: 'direction_id',
-      values: directionId
-    };
-    filters.push(directionFilter);
-
-    const fields: Fields = {
-      resource: 'prediction',
-      values: 'departure_time'
-    };
-
-    const sort = '';
-
-    const limit = 1;
-
-    this.apiService.getResource(endpoint, filters, fields, sort, limit)
+    this.apiService.getResource(rw)
       .subscribe(val => {
         if (val.data) {
           this.nextPredictedDeparture =  {
@@ -194,5 +129,21 @@ export class ProjectComponent implements OnInit {
         }
         this.nextPredictedDeparture.state = PredictionState.Loaded;
       });
+  }
+
+  // methods to clear previously set options due to change in higher-level value
+
+  clearStops(): void {
+    this.selectedStop = null;
+    this.stops = [];
+  }
+
+  clearRoutePatterns(): void {
+    this.selectedRoutePattern = null;
+    this.routePatterns = [];
+  }
+
+  clearNextPredictedDeparture(): void {
+    this.nextPredictedDeparture = null;
   }
 }

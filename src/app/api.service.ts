@@ -4,51 +4,79 @@ import { catchError, tap } from 'rxjs/operators';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { MessageService } from './message.service';
 
-import { Route } from './route';
-import { Filter } from './filter';
-import { Fields } from './fields';
+import { RequestWrapper, Filter, Fields } from './request';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
   private baseUrl = 'https://api-v3.mbta.com/';
+  private regExp = /[&]{2,}/g; // Reg Exp targets consecutive occurences of ampersands >= 2
 
   constructor(
     private http: HttpClient,
     private messageService: MessageService
   ) { }
 
-  getResource(resource: string, filters?: Filter[], fields?: Fields, sort?: string, limit?: number): Observable<any> {
-    let filterString = '';
-    if (filters) {
-      for (const filter of filters) {
-        filterString +=  `filter[${filter.resource}]=${filter.values.replace(/\s/g, '')}&`;
-      }
-    }
+  getResource(r: RequestWrapper): Observable<any> {
+    const resource = r.getResource();
+    const filters = r.getFilters();
+    const fields = r.getFields();
+    const sortParam = r.getSortParam();
+    const limit = r.getLimit();
 
-    let fieldString = '';
-    if (fields) {
-      fieldString = `fields[${fields.resource}]=${fields.values.replace(/\s/g, '')}&`;
-    }
+    const filterString = this.buildFilterString(filters);
+    const fieldString = this.buildFieldString(fields);
+    const sortString = this.buildSortString(sortParam);
+    const limitString = this.buildLimitString(limit);
 
-    let sortString = '';
-    if (sort) {
-      sortString = `sort=${sort.replace(/\s/g, '')}`;
-    }
-
-    let limitString = '';
-    if (limit > 0) {
-      limitString = `&page[limit]=${limit}`;
-    }
-
-    const url = encodeURI(this.baseUrl + resource + '/?' + filterString + fieldString + sortString + limitString);
+    const url = encodeURI(
+                  this.cleanConsecutiveAmpersands(this.baseUrl + resource + '/?' + filterString + fieldString + sortString + limitString)
+                );
 
     return this.http.get<any>(url)
     .pipe(
       tap(_ => this.log(`fetched ${resource}`)),
       catchError(this.handleError<any>('getResource', []))
     );
+  }
+
+  // string builder helpers
+
+  buildFilterString(filters: Filter[]): string {
+    const filterArray = [];
+    let filterString = '';
+    if (filters) {
+      for (const filter of filters) {
+        filterArray.push(`filter[${filter.resource}]=${filter.values}`);
+      }
+      filterString = filterArray.join('&');
+    }
+    return filterString;
+  }
+
+  buildFieldString(fields: Fields): string {
+    let fieldString = '';
+    if (fields) {
+      fieldString = `&fields[${fields.resource}]=${fields.values}&`;
+    }
+    return fieldString;
+  }
+
+  buildSortString(sortParam: string): string {
+    let sortString = '';
+    if (sortParam) {
+      sortString = `&sort=${sortParam}&`;
+    }
+    return sortString;
+  }
+
+  buildLimitString(limit: number): string {
+    let limitString = '';
+    if (limit > 0) {
+      limitString = `&page[limit]=${limit}`;
+    }
+    return limitString;
   }
 
   /**
@@ -73,6 +101,10 @@ export class ApiService {
 
   private log(message: string) {
     this.messageService.add(`ApiService: ${message}`);
+  }
+
+  private cleanConsecutiveAmpersands(dirtyString: string): string {
+    return dirtyString.replace(this.regExp, '&');
   }
 
 }
