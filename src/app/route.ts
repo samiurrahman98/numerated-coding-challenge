@@ -1,5 +1,4 @@
 export class Route {
-
   constructor(
     public id: string = '',
     public attributes: {
@@ -7,5 +6,4 @@ export class Route {
       long_name: string
     }
   ) {  }
-
 }

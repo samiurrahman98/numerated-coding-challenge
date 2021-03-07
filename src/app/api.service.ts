@@ -19,7 +19,7 @@ export class ApiService {
     private messageService: MessageService
   ) { }
 
-  getResource(resource: string, filters?: Filter[], fields?: Fields, sort?: string): Observable<any> {
+  getResource(resource: string, filters?: Filter[], fields?: Fields, sort?: string, limit?: number): Observable<any> {
     let filterString = '';
     if (filters) {
       for (const filter of filters) {
@@ -37,7 +37,12 @@ export class ApiService {
       sortString = `sort=${sort.replace(/\s/g, '')}`;
     }
 
-    const url = encodeURI(this.baseUrl + resource + '/?' + filterString + fieldString + sortString);
+    let limitString = '';
+    if (limit > 0) {
+      limitString = `&page[limit]=${limit}`;
+    }
+
+    const url = encodeURI(this.baseUrl + resource + '/?' + filterString + fieldString + sortString + limitString);
 
     return this.http.get<any>(url)
     .pipe(

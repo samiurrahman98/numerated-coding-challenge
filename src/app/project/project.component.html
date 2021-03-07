@@ -8,28 +8,30 @@
       </select>
     </div>
 
-    <p></p>
-
-    <div class="form-group" *ngIf="selectedRoute">
+    <div class="form-group" *ngIf="selectedRoute && stops">
       <label for="stops">Stops</label>
       <select class="form-control" name="stops" id="stops" [ngModel]="selectedStop" (ngModelChange)='onSelectStop($event)' required>
         <option *ngFor="let stop of stops" [value]="stop.id">{{stop.attributes.name}}: {{stop.attributes.address}}</option>
       </select>
     </div>
 
-    <div class="form-group" *ngIf="selectedRoute && selectedStop && directionsBuilt.built">
+    <div class="form-group" *ngIf="selectedRoute && selectedStop && routePatterns">
       <label for="directions">Directions</label>
-      <select class="form-control" name="directions" id="directions" [ngModel]="selectedDirection" (ngModelChange)='onSelectDirection($event)' required>
-        <option *ngFor="let direction of directionsBuilt.directionWrappers" [value]="direction.directionObject.attributes.directionId">{{direction.label}}</option>
+      <select class="form-control" name="routePattern" id="routePattern" [ngModel]="selectedRoutePattern" (ngModelChange)='onSelectRoutePattern($event)' required>
+        <option *ngFor="let routePattern of routePatterns" [value]="routePattern.id">{{routePattern.label}}</option>
       </select>
     </div>
 
-    <div class="form-group" *ngIf="selectedRoute && selectedStop && selectedDirection">
-      <label for="name">Next Predicted Departure Time</label>
-      <input type="text" class="form-control" id="name" required>
+    <div class="form-group" *ngIf="selectedRoute && selectedStop && selectedRoutePattern && nextPredictedDeparture">
+      <div *ngIf="nextPredictedDeparture.state === predictionState.Loaded">
+        <div *ngIf="nextPredictedDeparture.prediction; else not_found">
+          <label for="name">Next Predicted Departure Time</label>
+          <p id="nextPredictedDepartureTime">{{ nextPredictedDeparture.prediction.attributes.departure_time | date: 'full' }}</p>
+        </div>
+        <ng-template #not_found>
+          <p id="nextPredictedDepartureTimeNotFound">{{ nextPredictedDepartureTimeNotFound }}</p>
+        </ng-template>
+      </div>
     </div>
-
-    <button type="submit" class="btn btn-success">Submit</button>
-
   </form>
 </div>
