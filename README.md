@@ -1,4 +1,4 @@
-# numerated-coding-challenge
+# Numerated Coding Challenge
 
 To build and run the application, you will need to install the Angular CLI. Please ensure that you have the latest version of node.js installed on your machine, and the node package manager (npm).
 
